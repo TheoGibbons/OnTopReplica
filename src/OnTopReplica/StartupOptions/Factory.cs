@@ -33,7 +33,7 @@ namespace OnTopReplica.StartupOptions {
             if (Settings.Default.RestoreSizeAndPosition) {
                 options.StartLocation = Settings.Default.RestoreLastPosition;
                 options.StartSize = Settings.Default.RestoreLastSize;
-                options.DisableChrome = !Settings.Default.RestoreLastShowChrome;
+                options.ShowWindowBorder = Settings.Default.RestoreLastShowChrome;
 
                 Log.Write("Restoring window at {0} size {1} {2}", Settings.Default.RestoreLastPosition, Settings.Default.RestoreLastSize,
                     (Settings.Default.RestoreLastShowChrome) ? "with chrome" : "without chrome");
@@ -122,7 +122,7 @@ namespace OnTopReplica.StartupOptions {
                     options.EnableClickThrough = true;
                 })
                 .Add("chromeOff", "Disables the window's chrome (border).", s => {
-                    options.DisableChrome = true;
+                    options.ShowWindowBorder = false;
                 })
                 .Add("fs|fullscreen", "Starts up in fullscreen mode.", s => {
                     options.Fullscreen = true;

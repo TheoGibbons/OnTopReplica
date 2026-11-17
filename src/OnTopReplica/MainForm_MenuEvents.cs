@@ -156,7 +156,7 @@ namespace OnTopReplica {
         }
 
         private void Menu_Chrome_click(object sender, EventArgs e) {
-            IsChromeVisible = !IsChromeVisible;
+            ShowWindowBorder = !IsChromeVisible;
         }
 
         private void Menu_Settings_click(object sender, EventArgs e) {

@@ -16,7 +16,6 @@ namespace OnTopReplica.StartupOptions {
         public Options() {
             Status = CliStatus.Ok;
             Opacity = 255;
-            DisableChrome = false;
             MustBeVisible = false;
             Fullscreen = false;
         }
@@ -57,7 +56,11 @@ namespace OnTopReplica.StartupOptions {
 
         public byte Opacity { get; set; }
 
-        public bool DisableChrome { get; set; }
+        /// <summary>
+        /// Gets or sets whether the window border is shown while cloning.
+        /// Null keeps the default (hidden).
+        /// </summary>
+        public bool? ShowWindowBorder { get; set; }
 
         public bool Fullscreen { get; set; }
 
@@ -145,6 +148,12 @@ namespace OnTopReplica.StartupOptions {
                 }
             }
 
+            //The start location is stored for the form with its border: show it while applying
+            //the location (the border setting is applied again below)
+            if (StartLocation.HasValue) {
+                form.IsChromeVisible = true;
+            }
+
             //Size and location start values
             if (StartLocation.HasValue && StartSize.HasValue) {
                 form.StartPosition = System.Windows.Forms.FormStartPosition.Manual;
@@ -168,7 +177,13 @@ namespace OnTopReplica.StartupOptions {
                 form.ClickThroughEnabled = true;
             }
 
-            form.IsChromeVisible = !DisableChrome;
+            //Window border
+            if (ShowWindowBorder.HasValue) {
+                form.ShowWindowBorder = ShowWindowBorder.Value;
+            }
+            else {
+                form.RefreshWindowBorder();
+            }
 
             //Fullscreen
             if (Fullscreen) {

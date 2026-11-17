@@ -74,7 +74,7 @@ namespace OnTopReplica {
                 Application.Run(_mainForm);
 
                 //Re-enable chrome to store correct position (position is stored always WITH chrome: when restoring fails, the position stays ok)
-                Settings.Default.RestoreLastShowChrome = _mainForm.IsChromeVisible;
+                Settings.Default.RestoreLastShowChrome = _mainForm.ShowWindowBorder;
                 if (!_mainForm.IsChromeVisible)
                     _mainForm.IsChromeVisible = true;
 

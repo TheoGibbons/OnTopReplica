@@ -310,6 +310,9 @@ namespace OnTopReplica {
 
                 //Set aspect ratio (this will resize the form), do not refresh if in fullscreen
                 SetAspectRatio(_thumbnailPanel.ThumbnailPixelSize, !FullscreenManager.IsFullscreen);
+
+                //Hide the window border, unless the user wants it
+                RefreshWindowBorder();
             }
             catch (Exception ex) {
                 Log.WriteException("Unable to set new thumbnail", ex);
@@ -348,6 +351,9 @@ namespace OnTopReplica {
 
             //Disable aspect ratio
             KeepAspectRatio = false;
+
+            //Nothing cloned: show the window border again
+            RefreshWindowBorder();
         }
 
         /// <summary>

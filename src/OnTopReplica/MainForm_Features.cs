@@ -106,6 +106,10 @@ namespace OnTopReplica {
                 return (FormBorderStyle == DefaultBorderStyle);
             }
             set {
+                //Nothing to do (would otherwise shift the form's location)
+                if (value == IsChromeVisible)
+                    return;
+
                 //Cancel hiding chrome if no thumbnail is shown
                 if (!value && !_thumbnailPanel.IsShowingThumbnail)
                     return;
@@ -128,6 +132,35 @@ namespace OnTopReplica {
                 Program.Platform.OnFormStateChange(this);
                 Invalidate();
             }
+        }
+
+        bool _showWindowBorder = false;
+
+        /// <summary>
+        /// Gets or sets whether the window border is shown while a window is being cloned
+        /// (the "Show window border" option). Off by default.
+        /// The border is always shown while no window is being cloned.
+        /// </summary>
+        public bool ShowWindowBorder {
+            get {
+                return _showWindowBorder;
+            }
+            set {
+                _showWindowBorder = value;
+                RefreshWindowBorder();
+            }
+        }
+
+        /// <summary>
+        /// Shows or hides the window border according to <see cref="ShowWindowBorder"/>
+        /// and to whether a window is being cloned.
+        /// </summary>
+        public void RefreshWindowBorder() {
+            //Fullscreen mode manages the border on its own
+            if (FullscreenManager.IsFullscreen)
+                return;
+
+            IsChromeVisible = _showWindowBorder || !_thumbnailPanel.IsShowingThumbnail;
         }
 
         #endregion
