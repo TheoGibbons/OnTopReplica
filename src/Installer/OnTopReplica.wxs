@@ -8,7 +8,10 @@
               -o OnTopReplica.msi
 
   UpgradeCode, product name and Start menu shortcut match the original Visual Studio
-  installer (Installer.vdproj), so this package upgrades existing installations.
+  installer (Installer.vdproj). Installations made with this package upgrade each other.
+  The original 3.5.1 installer defaulted to a per-user ("Just me") installation, which a
+  per-machine package can't detect through its UpgradeCode, so setup asks for it to be
+  uninstalled first rather than installing a second copy.
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
@@ -28,6 +31,14 @@
     </Property>
     <Launch Condition="Installed OR (NETFRAMEWORKRELEASE AND NETFRAMEWORKRELEASE &gt;= &quot;#460798&quot;)"
             Message="OnTopReplica requires the .NET Framework 4.7 or later. Please install it and run this setup again." />
+
+    <!-- Per-user installation of the original OnTopReplica 3.5.1 (ProductCode {F149C020-D121-45B2-A630-5DB052413244},
+         registered under its packed GUID) -->
+    <Property Id="LEGACYPERUSERINSTALL">
+      <RegistrySearch Root="HKCU" Key="Software\Microsoft\Installer\Products\020C941F121D2B546A03D50B25142344" Name="ProductName" Type="raw" />
+    </Property>
+    <Launch Condition="Installed OR NOT LEGACYPERUSERINSTALL"
+            Message="OnTopReplica 3.5.1 is installed for your user account only, so this setup can't replace it. Please uninstall it first (Settings &gt; Apps &gt; Installed apps &gt; OnTopReplica), then run this setup again." />
 
     <Icon Id="AppIcon.ico" SourceFile="$(sys.SOURCEFILEDIR)..\OnTopReplica\new-flat-icon.ico" />
     <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />

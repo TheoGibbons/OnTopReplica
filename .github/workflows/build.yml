@@ -119,7 +119,7 @@ jobs:
             $notes = @(
               '## Downloads'
               ''
-              "- **OnTopReplica-$env:VERSION-setup.msi**: installer. Installs to Program Files with a Start menu shortcut, and upgrades an existing OnTopReplica installation."
+              "- **OnTopReplica-$env:VERSION-setup.msi**: installer. Installs for all users to Program Files with a Start menu shortcut, and upgrades versions previously installed with it. If the original OnTopReplica 3.5.1 is installed, setup will ask you to uninstall it first."
               "- **OnTopReplica-$env:VERSION-portable.zip**: no installation needed. Extract it anywhere and run ``OnTopReplica.exe``."
               ''
               'Both need the .NET Framework 4.7 or later, which is built into Windows 10 (version 1703 and later) and Windows 11.'
