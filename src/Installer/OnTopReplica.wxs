@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  OnTopReplica MSI installer (WiX Toolset v5).
+
+  Build (after building OnTopReplica in Release):
+    wix build OnTopReplica.wxs -arch x64 -ext WixToolset.UI.wixext
+              -d Version=3.5.2 -d AppDir=<folder containing OnTopReplica.exe>
+              -o OnTopReplica.msi
+
+  UpgradeCode, product name and Start menu shortcut match the original Visual Studio
+  installer (Installer.vdproj), so this package upgrades existing installations.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+
+  <Package Name="OnTopReplica"
+           Manufacturer="OnTopReplica"
+           Version="$(Version)"
+           UpgradeCode="6EBB4E0A-1F0C-4302-AC60-45E05F641909"
+           Scope="perMachine">
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- OnTopReplica targets .NET Framework 4.7 (release key 460798) -->
+    <Property Id="NETFRAMEWORKRELEASE">
+      <RegistrySearch Root="HKLM" Key="SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full" Name="Release" Type="raw" />
+    </Property>
+    <Launch Condition="Installed OR (NETFRAMEWORKRELEASE AND NETFRAMEWORKRELEASE &gt;= &quot;#460798&quot;)"
+            Message="OnTopReplica requires the .NET Framework 4.7 or later. Please install it and run this setup again." />
+
+    <Icon Id="AppIcon.ico" SourceFile="$(sys.SOURCEFILEDIR)..\OnTopReplica\new-flat-icon.ico" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
+
+    <WixVariable Id="WixUILicenseRtf" Value="$(sys.SOURCEFILEDIR)License.rtf" />
+    <ui:WixUI Id="WixUI_Minimal" />
+
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="INSTALLFOLDER" Name="OnTopReplica" />
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ShortcutFolder" Name="OnTopReplica" />
+    </StandardDirectory>
+
+    <Feature Id="Main">
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentRef Id="StartMenuShortcut" />
+    </Feature>
+  </Package>
+
+  <Fragment>
+    <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
+      <Component>
+        <File Id="OnTopReplicaExe" Source="$(AppDir)\OnTopReplica.exe" />
+      </Component>
+
+      <!-- Everything else in the build output: config, WindowsFormsAero.dll, license/credits, localized resources -->
+      <Files Include="$(AppDir)\**">
+        <Exclude Files="$(AppDir)\OnTopReplica.exe" />
+        <Exclude Files="$(AppDir)\**\*.pdb" />
+        <Exclude Files="$(AppDir)\**\*.xml" />
+      </Files>
+    </ComponentGroup>
+
+    <Component Id="StartMenuShortcut" Directory="ShortcutFolder">
+      <Shortcut Id="AppShortcut"
+                Name="OnTopReplica"
+                Description="Real-time, always on top thumbnail of a window of your choice."
+                Target="[INSTALLFOLDER]OnTopReplica.exe"
+                WorkingDirectory="INSTALLFOLDER">
+        <!-- Must match the explicit AppUserModelID the app sets on startup, for taskbar pinning/grouping -->
+        <ShortcutProperty Key="System.AppUserModel.ID" Value="LorenzCunoKlopfenstein.OnTopReplica.MainForm" />
+      </Shortcut>
+      <RemoveFolder Id="RemoveShortcutFolder" On="uninstall" />
+      <RegistryValue Root="HKCU" Key="Software\OnTopReplica" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+  </Fragment>
+
+</Wix>

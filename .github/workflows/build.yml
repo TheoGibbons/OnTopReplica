@@ -1,0 +1,129 @@
+name: Build
+
+# Every push and pull request builds the portable zip and the MSI installer and uploads them
+# as workflow artifacts. Pushing a version tag (e.g. v3.5.3) also publishes them as a GitHub
+# release; the version number is taken from the tag and stamped into the app.
+
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write # lets tag builds publish a GitHub release
+
+env:
+  WIX_VERSION: '5.0.2'
+  REFASM_VERSION: '1.0.3'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Determine version
+        run: |
+          $assemblyInfo = 'src/OnTopReplica/Properties/AssemblyInfo.cs'
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            if ($env:GITHUB_REF_NAME -notmatch '^v(\d+\.\d+\.\d+)$') {
+              throw "Release tags must look like v1.2.3 (got '$env:GITHUB_REF_NAME')"
+            }
+            $version = $Matches[1]
+            $content = Get-Content $assemblyInfo -Raw
+            $content = $content -replace '(?m)^\[assembly: Assembly(File)?Version\("[^"]*"\)\]', "[assembly: Assembly`$1Version(`"$version.0`")]"
+            Set-Content $assemblyInfo $content -NoNewline -Encoding utf8BOM
+          }
+          else {
+            $version = (Select-String -Path $assemblyInfo -Pattern '^\[assembly: AssemblyVersion\("(\d+\.\d+\.\d+)').Matches[0].Groups[1].Value
+          }
+          if (-not $version) { throw "Could not determine the version" }
+          Write-Host "Building OnTopReplica $version"
+          "VERSION=$version" >> $env:GITHUB_ENV
+
+      - name: Set up build tools
+        run: |
+          # MSBuild from the runner's Visual Studio installation
+          $msbuild = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -requires Microsoft.Component.MSBuild -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
+          if (-not $msbuild) { throw "MSBuild not found" }
+          "MSBUILD=$msbuild" >> $env:GITHUB_ENV
+
+          # .NET Framework 4.7 reference assemblies, so the build doesn't depend on the runner's targeting packs
+          $refasm = "$env:RUNNER_TEMP\refasm"
+          Invoke-WebRequest "https://www.nuget.org/api/v2/package/Microsoft.NETFramework.ReferenceAssemblies.net47/$env:REFASM_VERSION" -OutFile "$refasm.zip"
+          Expand-Archive "$refasm.zip" $refasm
+          "REFASM_ROOT=$refasm\build" >> $env:GITHUB_ENV
+
+          # WiX Toolset, for the MSI
+          dotnet tool install wix --version $env:WIX_VERSION --tool-path "$env:RUNNER_TEMP\wix"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          "$env:RUNNER_TEMP\wix" >> $env:GITHUB_PATH
+
+      - name: Build
+        run: |
+          $common = "-p:SolutionDir=$pwd\src\\", '-nologo', '-v:minimal'
+          & $env:MSBUILD src/OnTopReplica/OnTopReplica.csproj -t:restore -p:RestorePackagesConfig=true @common
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          & $env:MSBUILD src/OnTopReplica/OnTopReplica.csproj -p:Configuration=Release "-p:TargetFrameworkRootPath=$env:REFASM_ROOT" @common
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+      - name: Package
+        run: |
+          $staging = "$env:RUNNER_TEMP\staging\OnTopReplica"
+          New-Item -ItemType Directory -Force dist | Out-Null
+
+          # Application files, without debug symbols and API docs
+          robocopy src/OnTopReplica/bin/Release $staging /E /XF *.pdb *.xml /NFL /NDL /NJH /NJS /NP
+          if ($LASTEXITCODE -ge 8) { exit $LASTEXITCODE }
+
+          # Portable zip (extracts to an OnTopReplica folder)
+          Compress-Archive -Path $staging -DestinationPath "dist/OnTopReplica-$env:VERSION-portable.zip"
+
+          # MSI installer
+          wix extension add WixToolset.UI.wixext/$env:WIX_VERSION
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          wix build src/Installer/OnTopReplica.wxs -arch x64 -ext WixToolset.UI.wixext -d Version=$env:VERSION -d AppDir=$staging -o "$env:RUNNER_TEMP\msi\OnTopReplica-$env:VERSION-setup.msi"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          Copy-Item "$env:RUNNER_TEMP\msi\*.msi" dist
+
+          Get-ChildItem dist | Format-Table Name, Length
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: OnTopReplica-${{ env.VERSION }}
+          path: dist/
+          if-no-files-found: error
+
+      - name: Publish release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $files = (Get-ChildItem dist -File).FullName
+          $existing = gh release list --limit 100 --json tagName --jq '.[].tagName'
+          if ($existing -contains $tag) {
+            # Release already exists (e.g. created in the GitHub UI): attach the files to it
+            gh release upload $tag @files --clobber
+          }
+          else {
+            $notes = @(
+              '## Downloads'
+              ''
+              "- **OnTopReplica-$env:VERSION-setup.msi**: installer. Installs to Program Files with a Start menu shortcut, and upgrades an existing OnTopReplica installation."
+              "- **OnTopReplica-$env:VERSION-portable.zip**: no installation needed. Extract it anywhere and run ``OnTopReplica.exe``."
+              ''
+              'Both need the .NET Framework 4.7 or later, which is built into Windows 10 (version 1703 and later) and Windows 11.'
+            ) -join "`n"
+            gh release create $tag @files --title "OnTopReplica $env:VERSION" --notes $notes --generate-notes
+          }
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
